@@ -1,0 +1,25 @@
+{
+  "name": "edl-converter",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser tool that converts XLSX (START TIME / END TIME / TEXT) and DOCX (timecoded lines) into CMX3600 EDL files",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "mammoth": "^1.13.0",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  },
+  "devDependencies": {
+    "jszip": "^3.10.2",
+    "typescript": "^7.0.2",
+    "vite": "^7.3.7",
+    "vitest": "^3.2.7"
+  }
+}

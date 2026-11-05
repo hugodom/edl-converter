@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>XLSX / DOCX → EDL converter</title>
+    <meta name="description" content="Drop an Excel sheet (START TIME, END TIME, TEXT) or a Word document with timecoded lines and download a CMX3600 EDL with markers. Runs entirely in your browser." />
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>XLSX / DOCX → EDL</h1>
+        <p>
+          Turn a spreadsheet (<code>START TIME</code>, <code>END TIME</code>, <code>TEXT</code>) or a Word
+          document with lines like <code>00:12 Some text</code> into a CMX3600 EDL with markers.
+          Everything runs in your browser; your files are never uploaded.
+        </p>
+      </header>
+
+      <label id="dropzone" class="dropzone" tabindex="0">
+        <input id="file" type="file" accept=".xlsx,.xlsm,.xls,.docx" hidden />
+        <strong>Drop an .xlsx or .docx here</strong>
+        <span>or click to choose a file</span>
+        <span id="filename" class="filename"></span>
+      </label>
+      <p class="samples">
+        No file handy? Try the samples:
+        <a href="./samples/sample.xlsx" download>sample.xlsx</a> ·
+        <a href="./samples/sample.docx" download>sample.docx</a>
+      </p>
+
+      <section id="options" class="panel" hidden>
+        <h2>Options</h2>
+        <div class="grid">
+          <label>EDL title <input id="title" type="text" value="" /></label>
+          <label>Frame rate <select id="fps"></select></label>
+          <label>Start timecode <input id="offset" type="text" value="01:00:00:00" spellcheck="false" /></label>
+          <label>Last cue length (s) <input id="duration" type="number" min="0.04" step="0.5" value="3" /></label>
+          <label>Marker color <select id="color"></select></label>
+        </div>
+        <div id="columns" class="grid" hidden>
+          <label>START column <select id="col-start"></select></label>
+          <label>END column <select id="col-end"></select></label>
+          <label>TEXT column <select id="col-text"></select></label>
+        </div>
+      </section>
+
+      <section id="messages" class="warnings" hidden></section>
+
+      <section id="result" class="panel" hidden>
+        <div class="result-head">
+          <h2><span id="count">0</span> events</h2>
+          <div>
+            <button id="copy" type="button" class="secondary">Copy</button>
+            <button id="download" type="button">Download .edl</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>#</th><th>Start</th><th>End</th><th>Text</th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <footer>
+        <a href="https://github.com/hugodom/edl-converter">Source on GitHub</a> · MIT license
+      </footer>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
