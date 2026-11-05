@@ -1,6 +1,6 @@
-import JSZip from 'jszip';
 import { describe, expect, it } from 'vitest';
 import { utils, write } from 'xlsx';
+import { makeDocx } from '../scripts/docx-fixture.mjs';
 import { parseDocx, textToCues } from '../src/core/parseDocx';
 import { parseXlsx } from '../src/core/parseXlsx';
 import { getFrameRate } from '../src/core/timecode';
@@ -12,28 +12,7 @@ function makeXlsx(rows: unknown[][]): ArrayBuffer {
   const ws = utils.aoa_to_sheet(rows);
   const wb = utils.book_new();
   utils.book_append_sheet(wb, ws, 'Sheet1');
-  const out = write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
-  return out;
-}
-
-async function makeDocx(paragraphs: string[]): Promise<ArrayBuffer> {
-  const zip = new JSZip();
-  zip.file(
-    '[Content_Types].xml',
-    '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>',
-  );
-  zip.file(
-    '_rels/.rels',
-    '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>',
-  );
-  const body = paragraphs
-    .map((p) => `<w:p><w:r><w:t xml:space="preserve">${p}</w:t></w:r></w:p>`)
-    .join('');
-  zip.file(
-    'word/document.xml',
-    `<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body}</w:body></w:document>`,
-  );
-  return zip.generateAsync({ type: 'arraybuffer' });
+  return write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
 }
 
 describe('parseXlsx', () => {
@@ -129,7 +108,7 @@ describe('textToCues / parseDocx', () => {
   });
 
   it('reads a real .docx file', async () => {
-    const data = await makeDocx(['00:01 Intro', '00:05 Main &amp; more', '00:09 Outro']);
+    const data = await makeDocx(['00:01 Intro', '00:05 Main & more', '00:09 Outro']);
     const { cues, warnings } = await parseDocx(data, base);
     expect(warnings).toEqual([]);
     expect(cues.map((c) => c.text)).toEqual(['Intro', 'Main & more', 'Outro']);
