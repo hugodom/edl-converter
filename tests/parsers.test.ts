@@ -79,6 +79,18 @@ describe('parseXlsx', () => {
     ]);
   });
 
+  it('warns when a cue overlaps the next one', () => {
+    const { warnings } = parseXlsx(
+      makeXlsx([
+        ['START TIME', 'END TIME', 'TEXT'],
+        ['00:00:01', '00:00:06', 'A'],
+        ['00:00:04', '00:00:08', 'B'],
+      ]),
+      base,
+    );
+    expect(warnings.some((w) => /Row 2.*overlap/.test(w))).toBe(true);
+  });
+
   it('warns about unreadable times and skips the row', () => {
     const { cues, warnings } = parseXlsx(
       makeXlsx([

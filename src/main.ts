@@ -1,9 +1,16 @@
 import './style.css';
 import type { Cue } from './core/cues';
 import { buildEDL, MARKER_COLORS, type MarkerColor } from './core/edl';
-import { parseDocx } from './core/parseDocx';
-import { readSheet, sheetToCues, type ColumnMap, type SheetPreview } from './core/parseXlsx';
-import { DEFAULT_FRAME_RATE, FRAME_RATES, framesToTC, getFrameRate, parseTime } from './core/timecode';
+import type { ParseResult } from './core/cues';
+import type { ColumnMap, SheetPreview } from './core/parseXlsx';
+import {
+  DEFAULT_FRAME_RATE,
+  FRAME_RATES,
+  framesToTC,
+  getFrameRate,
+  parseTime,
+  type FrameRate,
+} from './core/timecode';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -29,9 +36,11 @@ const rowsEl = $('rows');
 const downloadBtn = $<HTMLButtonElement>('download');
 const copyBtn = $<HTMLButtonElement>('copy');
 
-type Loaded =
-  | { kind: 'xlsx'; name: string; sheet: SheetPreview }
-  | { kind: 'docx'; name: string; data: ArrayBuffer };
+/** A parsed input file. `convert` is synchronous so option changes can never race. */
+interface Loaded {
+  kind: 'xlsx' | 'docx';
+  convert(rate: FrameRate, defaultDuration: number): ParseResult;
+}
 
 let loaded: Loaded | null = null;
 let currentEdl = '';
@@ -77,11 +86,19 @@ async function loadFile(file: File): Promise<void> {
   try {
     const data = await file.arrayBuffer();
     if (ext === 'docx') {
-      loaded = { kind: 'docx', name: file.name, data };
+      // Heavy parsers are loaded on first use to keep the initial page small.
+      const { docxToText, textToCues } = await import('./core/parseDocx');
+      const text = await docxToText(data);
+      loaded = { kind: 'docx', convert: (rate, defaultDuration) => textToCues(text, { rate, defaultDuration }) };
     } else if (ext === 'xlsx' || ext === 'xlsm' || ext === 'xls') {
+      const { readSheet, sheetToCues } = await import('./core/parseXlsx');
       const sheet = readSheet(data);
-      loaded = { kind: 'xlsx', name: file.name, sheet };
       fillColumnSelects(sheet);
+      loaded = {
+        kind: 'xlsx',
+        convert: (rate, defaultDuration) =>
+          sheetToCues(sheet, { rate, defaultDuration, columns: readColumns() }),
+      };
     } else {
       throw new Error('Unsupported file type. Please drop an .xlsx or .docx file.');
     }
@@ -101,7 +118,7 @@ async function loadFile(file: File): Promise<void> {
   }
   optionsEl.hidden = false;
   columnsEl.hidden = loaded.kind !== 'xlsx';
-  await refresh();
+  refresh();
 }
 
 function fillColumnSelects(sheet: SheetPreview): void {
@@ -115,7 +132,7 @@ function fillColumnSelects(sheet: SheetPreview): void {
 }
 
 // ---- conversion ------------------------------------------------------------
-async function refresh(): Promise<void> {
+function refresh(): void {
   if (!loaded) return;
   const rate = getFrameRate(fpsEl.value);
   const warnings: string[] = [];
@@ -130,14 +147,7 @@ async function refresh(): Promise<void> {
 
   let cues: Cue[];
   try {
-    const result =
-      loaded.kind === 'xlsx'
-        ? sheetToCues(loaded.sheet, {
-            rate,
-            defaultDuration,
-            columns: readColumns(),
-          })
-        : await parseDocx(loaded.data, { rate, defaultDuration });
+    const result = loaded.convert(rate, defaultDuration);
     cues = result.cues;
     warnings.push(...result.warnings);
   } catch (err) {
@@ -211,11 +221,11 @@ function escapeHtml(s: string): string {
 
 // ---- option wiring & output ------------------------------------------------
 for (const el of [fpsEl, offsetEl, durationEl, colorEl, colSelects.start, colSelects.end, colSelects.text]) {
-  el.addEventListener('input', () => void refresh());
+  el.addEventListener('input', refresh);
 }
 titleEl.addEventListener('input', () => {
   titleEl.dataset.auto = '0';
-  void refresh();
+  refresh();
 });
 
 downloadBtn.addEventListener('click', () => {
@@ -225,11 +235,16 @@ downloadBtn.addEventListener('click', () => {
   a.href = url;
   a.download = `${currentName}.edl`;
   a.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
 
 copyBtn.addEventListener('click', async () => {
-  await navigator.clipboard.writeText(currentEdl);
-  copyBtn.textContent = 'Copied!';
+  let label = 'Copied!';
+  try {
+    await navigator.clipboard.writeText(currentEdl);
+  } catch {
+    label = 'Copy failed';
+  }
+  copyBtn.textContent = label;
   setTimeout(() => (copyBtn.textContent = 'Copy'), 1500);
 });

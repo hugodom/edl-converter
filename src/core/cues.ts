@@ -32,6 +32,11 @@ export function fillEnds(cues: Cue[], defaultDuration: number, warnings: string[
     if (i > 0 && cue.start < out[i - 1].start) {
       warnings.push(`Row ${cue.source}: start time is earlier than the previous row.`);
     }
+    const next = out[i + 1];
+    if (next && cue.end > next.start && next.start >= cue.start) {
+      // Strict EDL importers may reject events whose record times overlap.
+      warnings.push(`Row ${cue.source}: ends after the next row starts (overlap); some editors may reject the EDL.`);
+    }
   }
   return out;
 }
