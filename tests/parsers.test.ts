@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { utils, write } from 'xlsx';
 import { makeDocx } from '../scripts/docx-fixture.mjs';
+import { buildEDL } from '../src/core/edl';
 import { parseDocx, textToCues } from '../src/core/parseDocx';
 import { parseXlsx } from '../src/core/parseXlsx';
 import { getFrameRate } from '../src/core/timecode';
@@ -56,6 +57,39 @@ describe('parseXlsx', () => {
       [25, 125],
       [125, 175],
     ]);
+  });
+
+  it('sorts rows that are not in time order, keeping each text with its own time', () => {
+    // Shaped like a real ADR sheet: grouped by character, so times jump backwards.
+    const { cues, warnings } = parseXlsx(
+      makeXlsx([
+        ['Track', 'Start Time', 'End Time', 'Text'],
+        ['A', '07:19:03:00', '07:19:06:00', 'late'],
+        ['B', '07:01:40:16', '07:01:43:08', 'early'],
+        ['B', '07:05:39:11', '07:05:39:15', 'middle'],
+      ]),
+      base,
+    );
+    expect(cues.map((c) => c.text)).toEqual(['early', 'middle', 'late']);
+    expect(cues.map((c) => c.source)).toEqual([3, 4, 2]);
+    expect(cues.every((c, i) => i === 0 || c.start >= cues[i - 1].start)).toBe(true);
+    expect(warnings.some((w) => /sorted/.test(w))).toBe(true);
+  });
+
+  it('writes EDL events in ascending record order', () => {
+    const { cues } = parseXlsx(
+      makeXlsx([
+        ['START TIME', 'END TIME', 'TEXT'],
+        ['00:00:30:00', '00:00:32:00', 'c'],
+        ['00:00:10:00', '00:00:12:00', 'a'],
+        ['00:00:20:00', '00:00:22:00', 'b'],
+      ]),
+      base,
+    );
+    const edl = buildEDL(cues, { title: 't', rate, offset: 0, color: 'YELLOW' });
+    const recIns = [...edl.matchAll(/^\d{3}\s+AX\s+V\s+C\s+\S+ \S+ (\S+) \S+$/gm)].map((m) => m[1]);
+    expect(recIns).toEqual(['00:00:10:00', '00:00:20:00', '00:00:30:00']);
+    expect([...edl.matchAll(/^\* LOC: \S+ \S+\s+(.*)$/gm)].map((m) => m[1])).toEqual(['a', 'b', 'c']);
   });
 
   it('warns when a cue overlaps the next one', () => {
